@@ -1,10 +1,10 @@
 package category
 
 import (
-	"encoding/json"
 	"net/http"
-
-	"github.com/go-playground/validator/v10"
+	"product-management-api/pkg/messages"
+	"product-management-api/pkg/req"
+	"product-management-api/pkg/res"
 )
 
 type CategoryHandler struct {
@@ -20,31 +20,20 @@ func NewCategoryHandler(router *http.ServeMux, categoryService *CategoryService)
 
 func (h *CategoryHandler) CreateCategory() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var payload CategoryPayloadRequest
-		err := json.NewDecoder(r.Body).Decode(&payload)
+
+		payload, err := req.DecodedAndValidatedPayload[CategoryPayloadRequest](r)
 		if err != nil {
-			http.Error(w, "Неверное тело запроса", http.StatusBadRequest)
+			messages.ErrJson(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 
-		validate := validator.New()
-		err = validate.Struct(payload)
+		category, err := h.CategoryService.Create(payload)
 
 		if err != nil {
-			http.Error(w, "ошибка валидации", http.StatusBadRequest)
+			messages.ErrJson(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 
-		category, err := h.CategoryService.Create(&payload)
-
-		if err != nil {
-			http.Error(w, "Ошибка создания сущности в базе данных", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
-		json.NewEncoder(w).Encode(&category)
-
+		res.ResponseJson(w, http.StatusCreated, &category)
 	}
 }
